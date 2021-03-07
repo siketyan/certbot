@@ -100,3 +100,5 @@ Examples
      -d example.com
 
 """
+
+_snap_build = 'test'

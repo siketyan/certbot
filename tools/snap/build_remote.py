@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import datetime
 import glob
 import os
 import re
@@ -8,6 +7,7 @@ import subprocess
 import sys
 import time
 import tempfile
+from datetime import datetime
 from multiprocessing.managers import SyncManager
 from threading import Lock
 from multiprocessing import Pool, Process, Manager
@@ -22,11 +22,14 @@ def _execute_build(
         target: str, archs: Set[str], status: Dict[str, Dict[str, str]],
         workspace: str) -> Tuple[int, List[str]]:
 
+    with open(join(workspace, '.snapcraft-build-info'), 'w') as file_h:
+        file_h.write(f'archs={",".join(archs)} timestamp={datetime.timestamp(datetime.now())}')
+
     with tempfile.TemporaryDirectory() as tempdir:
         environ = os.environ.copy()
         environ['XDG_CACHE_HOME'] = tempdir
         process = subprocess.Popen([
-            'snapcraft', 'remote-build', '--launchpad-accept-public-upload', '--recover',
+            'snapcraft', 'remote-build', '--launchpad-accept-public-upload',
             '--build-on', ','.join(archs)],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             universal_newlines=True, env=environ, cwd=workspace)
@@ -34,6 +37,8 @@ def _execute_build(
     process_output: List[str] = []
     for line in process.stdout:
         process_output.append(line)
+        print(f"{target}: {line}")
+        sys.stdout.flush()
         _extract_state(target, line, status)
 
     return process.wait(), process_output
@@ -127,7 +132,7 @@ def _dump_status(
         archs: Set[str], status: Dict[str, Dict[str, str]],
         running: Dict[str, bool]) -> None:
     while any(running.values()):
-        print(f'Remote build status at {datetime.datetime.now()}')
+        print(f'Remote build status at {datetime.now()}')
         _dump_status_helper(archs, status)
         time.sleep(10)
 
@@ -162,7 +167,7 @@ def _dump_results(
         print('Some builds failed.')
 
     print()
-    print(f'Results for remote build finished at {datetime.datetime.now()}')
+    print(f'Results for remote build finished at {datetime.now()}')
     _dump_status_helper(archs, status)
 
     return failures
